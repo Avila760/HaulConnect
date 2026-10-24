@@ -1,0 +1,62 @@
+rules_version = '2';
+// Proposed source-controlled rules. Review against current deployed rules before publishing.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function userRole() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role; }
+    function admin() { return signedIn() && userRole() == 'admin'; }
+    function customer() { return signedIn() && userRole() == 'customer'; }
+    function assignedDriver() { return signedIn() && userRole() == 'driver' && resource.data.driverId == request.auth.uid; }
+    function owner() { return signedIn() && resource.data.customerId == request.auth.uid; }
+    function only(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    function awaiting() { return resource.data.status in ['requested', 'available', 'confirmed']; }
+    match /users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || admin());
+      allow list: if admin();
+      allow create: if signedIn() && request.auth.uid == uid && request.resource.data.role in ['customer', 'driver'];
+      // Admin role is granted by a trusted operator, never by public signup or profile editing.
+      allow update: if signedIn() && request.auth.uid == uid && only(['avatarKey','email','firstName','lastName','name','profilePhotoUrl','driverProfile','updatedAt','deletedAt']);
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+    match /jobs/{jobId} {
+      // Customers need to read a not-yet-existing document for an idempotent create transaction.
+      allow get: if signedIn() && ((!exists(/databases/$(database)/documents/jobs/$(jobId)) && customer()) || admin() || owner() || assignedDriver());
+      allow list: if admin() || owner() || assignedDriver();
+      allow create: if customer()
+        && request.resource.data.customerId == request.auth.uid
+        && request.resource.data.status == 'requested'
+        && request.resource.data.driverId == null && request.resource.data.driverName == null
+        && request.resource.data.street is string && request.resource.data.street.size() > 0
+        && request.resource.data.city is string && request.resource.data.city.size() > 0
+        && request.resource.data.state is string && request.resource.data.state.size() == 2
+        && request.resource.data.customerPhone is string && request.resource.data.customerPhone.size() >= 10
+        && request.resource.data.details is string && request.resource.data.details.size() > 0
+        && request.resource.data.paymentMethod in ['card','cash','check']
+        && request.resource.data.paymentStatus == 'unpaid'
+        && request.resource.data.quote == 0 && request.resource.data.payout == 0;
+      allow update: if
+        (admin() && awaiting() && request.resource.data.status == 'confirmed'
+          && only(['status','confirmedAt','history','updatedAt']) && request.resource.data.confirmedAt == request.time)
+        || (assignedDriver() && resource.data.status in ['accepted','en_route']
+          && only(['eta','etaUpdatedAt','updatedAt','history'])
+          && request.resource.data.eta is int && request.resource.data.eta > 0 && request.resource.data.eta <= 1440
+          && request.resource.data.etaUpdatedAt == request.time)
+        ||
+        (admin() && awaiting() && request.resource.data.status == 'assigned'
+          && request.resource.data.driverId is string
+          && get(/databases/$(database)/documents/users/$(request.resource.data.driverId)).data.role == 'driver'
+          && only(['driverId','driverName','status','updatedAt','confirmedAt','assignedAt','history','eta','etaUpdatedAt']))
+        || (assignedDriver() && resource.data.status == 'assigned'
+          && ((request.resource.data.status == 'accepted' && only(['status','updatedAt','acceptedAt','history']))
+            || (request.resource.data.status == 'requested' && request.resource.data.driverId == null
+              && request.resource.data.driverName == null && only(['status','driverId','driverName','lastDeclinedDriverName','updatedAt','declinedAt','history','eta','etaUpdatedAt']))))
+        || (assignedDriver() && only(['status','updatedAt','en_routeAt','arrivedAt','loadingAt','completedAt','history'])
+          && ((resource.data.status == 'accepted' && request.resource.data.status == 'en_route')
+            || (resource.data.status == 'en_route' && request.resource.data.status == 'arrived')
+            || (resource.data.status == 'arrived' && request.resource.data.status == 'loading')
+            || (resource.data.status == 'loading' && request.resource.data.status == 'completed')))
+        || (assignedDriver() && only(['proofPhotoUploads','updatedAt']))
+        || (owner() && awaiting() && only(['customerPhotoUploads','updatedAt']));
+    }
+  }
+}

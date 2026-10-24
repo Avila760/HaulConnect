@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "HaulConnect",
+    "slug": "haulconnect",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/android-icon-foreground.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.haulconnect.app",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "HaulConnect uses the camera so customers and drivers can attach job photos.",
+        "NSLocationWhenInUseUsageDescription": "HaulConnect uses your location so customers can track driver arrival.",
+        "NSPhotoLibraryUsageDescription": "HaulConnect uses your photo library if you choose to attach job photos."
+      }
+    },
+    "android": {
+      "package": "com.haulconnect.app",
+      "versionCode": 1,
+      "config": {
+        "googleMaps": {}
+      },
+      "permissions": [
+        "CAMERA",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#070B10",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "de5d4082-4e84-4ff2-81da-2cbce33c068f"
+      }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "HaulConnect uses the camera so customers and drivers can attach job photos.",
+          "photosPermission": "HaulConnect uses your photo library if you choose to attach job photos."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "HaulConnect uses your location so customers can track driver arrival."
+        }
+      ]
+    ],
+    "owner": "junkbiz760s-organization"
+  }
+}
